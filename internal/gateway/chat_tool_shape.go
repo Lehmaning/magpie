@@ -18,7 +18,11 @@ import (
 // shapeChatTools is a Chat request with each such tool in the Chat shape.
 // A tool that already has its function object, a hosted tool (any other
 // type), one with no name, and a request that doesn't parse are as they
-// came; a tool's other fields stay beside its function.
+// came; a tool's other fields stay beside its function. An empty tools
+// array says what no tools field says, and some Chat APIs turn the empty
+// one away (NVIDIA NIM: "tools array cannot be empty; omit the field
+// entirely to disable tool use"), so it goes with the choices that need
+// tools beside it.
 func shapeChatTools(body []byte) []byte {
 	if !bodyHas(body, `"tools"`) {
 		return body
@@ -26,6 +30,9 @@ func shapeChatTools(body []byte) []byte {
 	tools := gjson.GetBytes(body, "tools")
 	if !tools.IsArray() {
 		return body
+	}
+	if len(tools.Array()) == 0 {
+		return withoutFields(body, "tools", "tool_choice", "parallel_tool_calls")
 	}
 	need := false
 	for _, t := range tools.Array() {

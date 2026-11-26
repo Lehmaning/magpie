@@ -106,3 +106,25 @@ func TestShapeChatToolsLeavesChatShape(t *testing.T) {
 		t.Errorf("tool shaped as %s", b.Raw)
 	}
 }
+
+// An empty tools array says what no tools field says, and some Chat APIs
+// turn the empty one away (NVIDIA NIM: "tools array cannot be empty; omit
+// the field entirely to disable tool use"): it goes, with the choices that
+// need it, and the rest of the request stays. A request that offers a tool
+// is as it came.
+func TestShapeChatToolsDropsEmptyTools(t *testing.T) {
+	body := `{"model":"m","messages":[{"role":"user","content":"hi"}],"max_tokens":8,"tools":[],"tool_choice":"auto"}`
+	got := shapeChatTools([]byte(body))
+	for _, f := range []string{"tools", "tool_choice"} {
+		if gjson.GetBytes(got, f).Exists() {
+			t.Errorf("%s stayed in %s", f, got)
+		}
+	}
+	if gjson.GetBytes(got, "max_tokens").Int() != 8 || gjson.GetBytes(got, "messages.0.content").String() != "hi" {
+		t.Errorf("the rest changed: %s", got)
+	}
+	full := `{"model":"m","tools":[{"type":"function","function":{"name":"f"}}]}`
+	if s := string(shapeChatTools([]byte(full))); s != full {
+		t.Errorf("a tool changed: %s", s)
+	}
+}
